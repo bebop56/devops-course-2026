@@ -45,5 +45,14 @@ WEB_PERMS="ok"
 [[ "$(sudo stat -c '%a' /etc/ssl/private/devops.key)" != "600" ]] && WEB_PERMS="права ключа не 600"
 check "Нет файлов ресурса с правом записи для всех, ключ — 600" "ok" "$WEB_PERMS"
 
+echo "[5] Контейнеризация"
+check "Служба docker активна" "active" "$(systemctl is-active docker)"
+check "Контейнер СУБД в состоянии healthy" "healthy" \
+    "$(docker inspect -f '{{.State.Health.Status}}' app-db-1 2>/dev/null)"
+# адреса, на которых прослушиваются порты 5000 и 5432; допустим только 127.0.0.1
+EXPOSED="$(ss -tln | awk '$4 ~ /:(5000|5432)$/ {sub(/:[0-9]+$/, "", $4); print $4}' | grep -vx '127.0.0.1' | sort -u | paste -sd ' ')"
+check "Порты 5000 и 5432 прослушиваются только на 127.0.0.1" "" "$EXPOSED"
+check "Права файла ~/app/.env равны 600" "600" "$(stat -c '%a' "$HOME/app/.env" 2>/dev/null)"
+
 echo "Пройдено: $PASS, не пройдено: $FAIL"
 [[ $FAIL -eq 0 ]] && exit 0 || exit 1

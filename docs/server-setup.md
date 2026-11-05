@@ -178,3 +178,52 @@ sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 - Правило `/etc/sudoers.d/90-audit` дополнено командами `/usr/sbin/nginx -t` и
   `/usr/bin/stat -c %a /etc/ssl/private/devops.key`.
 - Снимок `04-nginx-https` — 06.11.2026, после задания 2 ПР № 6.
+
+## 9. Контейнеризация
+
+- Docker Engine 29.9.3 и Docker Compose v5.7.0 установлены из официального репозитория
+  Docker (не из пакетов дистрибутива; `docker.io`, `podman-docker` и т. п. отсутствуют):
+
+```bash
+sudo apt-get install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+  https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo usermod -aG docker devops     # затем новый вход, чтобы группа применилась
+```
+
+- Группа `docker`: только `devops` (членство в группе равносильно правам root;
+  у `devops` уже есть sudo, поэтому привилегии не расширяются).
+- Проект: `~/app` пользователя devops (`/home/devops/app`), копия каталога `app/`
+  репозитория; доставка с исключением `.env` (`rsync -av --delete --exclude=.env`).
+  Образ `devops-app:1.0` (python:3.12-slim, пользователь `app`, gunicorn на 0.0.0.0:5000).
+- Секреты: `~/app/.env`, владелец `devops`, права `600`, создаётся только на сервере
+  из `.env.example` со случайным паролем `openssl rand -hex 16`; в репозиторий и образ не попадает
+  (`.gitignore`, `.dockerignore`).
+- Сервисы Compose: `db` (postgres:16-alpine, проверка `pg_isready`), `app`
+  (запускается после `service_healthy`), оба `restart: unless-stopped`, сеть `app_backend`.
+- Публикуемые порты: только `127.0.0.1:5000 -> app:5000`; порт 5432 не публикуется.
+  Публикация на всех адресах (`"5000:5000"`) обходит UFW через правила DNAT Docker —
+  её отсутствие проверяет раздел [5] `scripts/audit.sh`.
+- Именованный том: `app_db_data` -> `/var/lib/postgresql/data`
+  (`docker compose down` его сохраняет, `down -v` удаляет).
+- Обратный прокси: в блок HTTPS `/etc/nginx/sites-available/devops-site` добавлено
+
+```nginx
+location /app/ {
+    proxy_pass http://127.0.0.1:5000/;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+  Приложение доступно по `https://devops.local/app/`, статический ресурс — по `https://devops.local/`.
+- Запуск: `cd ~/app && docker compose up -d --build`; проверка: `docker compose ps`.
+- Снимок `05-docker-compose` — 06.11.2026, после задания 2 ПР № 7.
