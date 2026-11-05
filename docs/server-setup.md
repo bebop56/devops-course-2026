@@ -144,3 +144,37 @@ sudo ufw logging medium
 
 Снимки делаются на выключенной машине: под Hyper-V сохранение состояния памяти
 работающей ВМ идёт несколько десятков минут.
+
+## 8. Веб-сервер
+
+- Пакет: `nginx` из репозитория Ubuntu (`sudo apt install -y nginx`), версия 1.24.0.
+  Главный процесс работает от `root`, рабочие — от `www-data`.
+- Порты 80 и 443 уже открыты правилами раздела 6; профили `Nginx Full` и т. п. не добавляются.
+- Конфигурация ресурса: `/etc/nginx/sites-available/devops-site` (копия в репозитории —
+  `deploy/nginx/devops-site`), активирована ссылкой в `/etc/nginx/sites-enabled/`;
+  ссылка `sites-enabled/default` удалена, файл `sites-available/default` сохранён.
+  Блок 1 — порт 80, `return 301 https://$host$request_uri`; блок 2 — порт 443 ssl,
+  `ssl_protocols TLSv1.2 TLSv1.3`, `root /var/www/devops-site`, `error_page 404 /404.html`,
+  журналы `/var/log/nginx/devops-site.{access,error}.log`. HSTS не включается.
+- Применение изменений только так: `sudo nginx -t && sudo systemctl reload nginx`.
+- Каталог ресурса: `/var/www/devops-site`, владелец `devops:devops`, каталоги `755`,
+  файлы `644` (владелец пишет, веб-сервер читает). Содержимое доставляется
+  `scripts/deploy.sh` из каталога `site/`.
+- Сертификат: `/etc/ssl/certs/devops.crt`, `root:root`, `644`.
+- Закрытый ключ: `/etc/ssl/private/devops.key`, `root:root`, `600` (каталог `private` — `700`).
+- Формирование сертификата (самоподписанный, RSA 2048, срок 365 дней,
+  выпущен 05.11.2026, действителен до 05.11.2027):
+
+```bash
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout /etc/ssl/private/devops.key \
+  -out /etc/ssl/certs/devops.crt \
+  -subj "/CN=devops.local" \
+  -addext "subjectAltName=DNS:devops.local"
+```
+
+- На хосте сертификат лежит в `~/devops.crt` (скопирован `scp devops:/etc/ssl/certs/devops.crt ~/devops.crt`)
+  и передаётся клиенту через `curl --cacert ~/devops.crt`.
+- Правило `/etc/sudoers.d/90-audit` дополнено командами `/usr/sbin/nginx -t` и
+  `/usr/bin/stat -c %a /etc/ssl/private/devops.key`.
+- Снимок `04-nginx-https` — 06.11.2026, после задания 2 ПР № 6.

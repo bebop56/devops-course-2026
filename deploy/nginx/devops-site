@@ -1,0 +1,31 @@
+# Блок 1: перенаправление HTTP -> HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name devops.local;
+
+    return 301 https://$host$request_uri;
+}
+
+# Блок 2: HTTPS
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name devops.local;
+
+    ssl_certificate     /etc/ssl/certs/devops.crt;
+    ssl_certificate_key /etc/ssl/private/devops.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+
+    root /var/www/devops-site;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    error_page 404 /404.html;
+
+    access_log /var/log/nginx/devops-site.access.log;
+    error_log  /var/log/nginx/devops-site.error.log;
+}
