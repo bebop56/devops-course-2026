@@ -227,3 +227,18 @@ location /app/ {
   Приложение доступно по `https://devops.local/app/`, статический ресурс — по `https://devops.local/`.
 - Запуск: `cd ~/app && docker compose up -d --build`; проверка: `docker compose ps`.
 - Снимок `05-docker-compose` — 06.11.2026, после задания 2 ПР № 7.
+
+## 10. Контрольная работа № 2 (вариант 4)
+
+- Проект: `/home/devops/kr2` — копия репозитория https://github.com/bebop56/devops-kr2
+  (ветка `kr2/variant-4`), доставляется без `.env` и `.git`.
+- Сервисы Compose: `app` (образ `kr2-app:1.0`, порт `127.0.0.1:8004`) и `redis` (`redis:7-alpine`,
+  пароль, AOF, том `kr2_redis_data`), сеть `kr2_backend`, `restart: unless-stopped`.
+- Секрет: `~/kr2/.env` (права 600, владелец devops), пароль сгенерирован на сервере `openssl rand -hex 32`;
+  в репозитории только `.env.example`.
+- Ресурс `https://kv.devops.local`: `/etc/nginx/sites-available/kr2` (ссылка в `sites-enabled`),
+  HTTP → HTTPS (301), прокси на `127.0.0.1:8004`, журналы `/var/log/nginx/kr2.{access,error}.log`.
+- Сертификат: `/etc/ssl/certs/kr2.crt` (SAN `DNS:kv.devops.local`, 365 дней), ключ `/etc/ssl/private/kr2.key` (600, root).
+- Хост: в `hosts` добавлено `192.168.56.101  kv.devops.local`.
+- Правила UFW не менялись; `scripts/audit.sh` дополнен разделом `[6]`.
+- Снимки `06-before-kr2` и `07-kr2` — 06.11.2026.

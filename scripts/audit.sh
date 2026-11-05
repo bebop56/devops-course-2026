@@ -54,5 +54,19 @@ EXPOSED="$(ss -tln | awk '$4 ~ /:(5000|5432)$/ {sub(/:[0-9]+$/, "", $4); print $
 check "Порты 5000 и 5432 прослушиваются только на 127.0.0.1" "" "$EXPOSED"
 check "Права файла ~/app/.env равны 600" "600" "$(stat -c '%a' "$HOME/app/.env" 2>/dev/null)"
 
+echo "[6] Контрольная работа № 2"
+KR2_DIR="$HOME/kr2"
+# контейнер определяется по имени сервиса, а не по имени, сформированному Compose
+REDIS_CID="$(docker compose --project-directory "$KR2_DIR" ps -q redis 2>/dev/null)"
+check "Контейнер сервиса redis в состоянии healthy" "healthy" \
+    "$(docker inspect -f '{{.State.Health.Status}}' "$REDIS_CID" 2>/dev/null)"
+check "Порт 8004 опубликован только на 127.0.0.1" "127.0.0.1:8004" \
+    "$(docker compose --project-directory "$KR2_DIR" port app 8004 2>/dev/null | sort -u | paste -sd ' ')"
+check "Права файла ~/kr2/.env равны 600" "600" "$(stat -c '%a' "$KR2_DIR/.env" 2>/dev/null)"
+openssl x509 -in /etc/ssl/certs/kr2.crt -noout -checkend 2592000 >/dev/null 2>&1
+check "Сертификат kr2.crt действителен ещё 30+ дней" "0" "$?"
+check "Ресурс kr2 активирован (ссылка в sites-enabled)" "/etc/nginx/sites-available/kr2" \
+    "$(readlink -f /etc/nginx/sites-enabled/kr2 2>/dev/null)"
+
 echo "Пройдено: $PASS, не пройдено: $FAIL"
 [[ $FAIL -eq 0 ]] && exit 0 || exit 1
