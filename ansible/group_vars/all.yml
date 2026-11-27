@@ -1,0 +1,6 @@
+---
+app_image: "ghcr.io/bebop56/devops-ci-app"
+app_tag: "08e097ec6561be03d15bc1aa0602557eba8fe659"
+app_container_name: "devops-ci-app"
+app_host_port: 5000
+app_internal_port: 5000
